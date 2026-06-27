@@ -192,6 +192,14 @@
                 android:textColor="@color/on_surface"
                 android:textSize="18sp"
                 android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ketuk angka untuk mengedit nominal / biaya admin"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
                 android:layout_marginBottom="12dp" />
 
             <com.google.android.material.card.MaterialCardView

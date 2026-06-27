@@ -2,16 +2,19 @@ package id.hadimyapplication;
 
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.card.MaterialCardView;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -24,8 +27,8 @@ public class TransferActivity extends AppCompatActivity {
 
     private final NumberFormat rupiah = NumberFormat.getNumberInstance(new Locale("in", "ID"));
 
-    // Tier table: {maxNominal, adminFee}
-    private final long[][] tiers = {
+    // Tier table: {maxNominal, adminFee} — mutable so user can edit
+    private long[][] tiers = {
         {100_000L,   2_000L},
         {200_000L,   3_000L},
         {300_000L,   4_000L},
@@ -93,10 +96,13 @@ public class TransferActivity extends AppCompatActivity {
             highlightTierRow(-1);
             return;
         }
-        if (nominal > 1_000_000L) {
+
+        // Check if nominal exceeds the max tier
+        long maxTier = tiers[tiers.length - 1][0];
+        if (nominal > maxTier) {
             tvAdminFee.setText("—");
             tvTotal.setText("—");
-            tvTierInfo.setText("Melebihi batas tarif (> Rp 1.000.000)");
+            tvTierInfo.setText("Melebihi batas tarif (> Rp " + rupiah.format(maxTier) + ")");
             highlightTierRow(-1);
             return;
         }
@@ -123,12 +129,16 @@ public class TransferActivity extends AppCompatActivity {
     private void highlightTierRow(int activeIndex) {
         for (int i = 0; i < layoutTable.getChildCount(); i++) {
             android.view.View row = layoutTable.getChildAt(i);
-            if (i == activeIndex) {
+            if (i == 0) continue; // skip header
+            int dataIndex = i - 1;
+            if (dataIndex == activeIndex) {
                 row.setBackgroundColor(ContextCompat.getColor(this, R.color.primary_variant));
-                // Bold the text views in this row
                 setRowBold(row, true);
             } else {
-                row.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                int bgColor = dataIndex % 2 == 0
+                        ? ContextCompat.getColor(this, R.color.surface)
+                        : android.graphics.Color.TRANSPARENT;
+                row.setBackgroundColor(bgColor);
                 setRowBold(row, false);
             }
         }
@@ -192,9 +202,127 @@ public class TransferActivity extends AppCompatActivity {
         String nominalStr = "Rp " + rupiah.format(min) + " – Rp " + rupiah.format(max);
         String feeStr = "Rp " + rupiah.format(fee);
 
-        row.addView(makeCell(nominalStr, 0.6f, false));
-        row.addView(makeCell(feeStr, 0.4f, false));
+        TextView tvNominalCell = makeCell(nominalStr, 0.6f, false);
+        TextView tvFeeCell = makeCell(feeStr, 0.4f, false);
+
+        // Tap on nominal cell to edit the max nominal for this tier
+        final int tierIndex = index;
+        tvNominalCell.setBackground(ContextCompat.getDrawable(this, getSelectableItemBg()));
+        tvNominalCell.setClickable(true);
+        tvNominalCell.setFocusable(true);
+        tvNominalCell.setOnClickListener(v -> showEditDialog(
+                "Edit Nominal Tier " + (tierIndex + 1),
+                tiers[tierIndex][0],
+                newValue -> {
+                    tiers[tierIndex][0] = newValue;
+                    buildTierTable();
+                    calculate();
+                }
+        ));
+
+        // Tap on fee cell to edit the admin fee for this tier
+        tvFeeCell.setBackground(ContextCompat.getDrawable(this, getSelectableItemBg()));
+        tvFeeCell.setClickable(true);
+        tvFeeCell.setFocusable(true);
+        tvFeeCell.setOnClickListener(v -> showEditDialog(
+                "Edit Biaya Admin Tier " + (tierIndex + 1),
+                tiers[tierIndex][1],
+                newValue -> {
+                    tiers[tierIndex][1] = newValue;
+                    buildTierTable();
+                    calculate();
+                }
+        ));
+
+        row.addView(tvNominalCell);
+        row.addView(tvFeeCell);
         return row;
+    }
+
+    private int getSelectableItemBg() {
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        return outValue.resourceId;
+    }
+
+    private interface OnValueEditedListener {
+        void onValueEdited(long newValue);
+    }
+
+    private void showEditDialog(String title, long currentValue, OnValueEditedListener listener) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(title);
+
+        // Create EditText
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setTextSize(20);
+        input.setGravity(Gravity.CENTER);
+
+        // Set current value
+        if (currentValue > 0) {
+            input.setText(rupiah.format(currentValue));
+            input.setSelection(input.getText().length());
+        }
+        input.setHint("Masukkan nominal");
+
+        // Add formatting TextWatcher
+        input.addTextChangedListener(new TextWatcher() {
+            private boolean isUpdating = false;
+            @Override public void beforeTextChanged(CharSequence s, int i, int i1, int i2) {}
+            @Override public void onTextChanged(CharSequence s, int i, int i1, int i2) {}
+            @Override public void afterTextChanged(Editable s) {
+                if (isUpdating) return;
+                isUpdating = true;
+
+                String str = s.toString().replaceAll("[^\\d]", "");
+                try {
+                    if (!str.isEmpty()) {
+                        long parsed = Long.parseLong(str);
+                        String formatted = rupiah.format(parsed);
+                        input.setText(formatted);
+                        input.setSelection(formatted.length());
+                    }
+                } catch (NumberFormatException e) {
+                    // Ignore
+                }
+                isUpdating = false;
+            }
+        });
+
+        // Wrap EditText with padding
+        FrameLayout container = new FrameLayout(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(dp(24), dp(16), dp(24), dp(8));
+        input.setLayoutParams(params);
+        container.addView(input);
+
+        builder.setView(container);
+
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            String raw = input.getText().toString().replaceAll("[^\\d]", "");
+            long value = 0;
+            if (!raw.isEmpty()) {
+                try { value = Long.parseLong(raw); } catch (NumberFormatException e) { /* ignore */ }
+            }
+            listener.onValueEdited(value);
+        });
+
+        builder.setNegativeButton("Batal", (dialog, which) -> dialog.cancel());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Auto-show keyboard
+        input.requestFocus();
+        input.postDelayed(() -> {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        }, 200);
     }
 
     private TextView makeCell(String text, float weight, boolean isHeader) {
@@ -204,6 +332,7 @@ public class TransferActivity extends AppCompatActivity {
         tv.setTextSize(isHeader ? 13 : 13);
         tv.setTypeface(null, isHeader ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         tv.setTextColor(ContextCompat.getColor(this, isHeader ? R.color.text_secondary : R.color.on_surface));
+        tv.setPadding(dp(4), dp(4), dp(4), dp(4));
         return tv;
     }
 
