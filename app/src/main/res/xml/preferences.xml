@@ -1,0 +1,38 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <PreferenceCategory app:title="Tampilan">
+        <SwitchPreferenceCompat
+            app:key="dark_mode"
+            app:title="Mode Gelap"
+            app:summary="Aktifkan mode gelap untuk kenyamanan mata"
+            app:defaultValue="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Notifikasi">
+        <SwitchPreferenceCompat
+            app:key="daily_reminder"
+            app:title="Pengingat Update Harga"
+            app:summary="Ingatkan saya untuk mengecek harga setiap pagi jam 08:00"
+            app:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Database">
+        <Preference
+            app:key="backup_db"
+            app:title="Backup Database"
+            app:summary="Simpan data ke dalam file"
+            app:icon="@android:drawable/ic_menu_save" />
+        <Preference
+            app:key="restore_db"
+            app:title="Restore Database"
+            app:summary="Pulihkan data dari file backup"
+            app:icon="@android:drawable/ic_menu_upload" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Tentang">
+        <Preference
+            app:title="Versi Aplikasi"
+            app:summary="1.0.0" />
+    </PreferenceCategory>
+    
+</PreferenceScreen>
